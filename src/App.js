@@ -1,38 +1,19 @@
-// 1. Install dependencies DONE
-// 2. Import dependencies DONE
-// 3. Setup webcam and canvas DONE
-// 4. Define references to those DONE
-// 5. Load posenet DONE
-// 6. Detect function DONE
-// 7. Drawing utilities from tensorflow DONE
-// 8. Draw functions DONE
-
-// Face Mesh - https://github.com/tensorflow/tfjs-models/tree/master/facemesh
-
-import React, { useRef, useEffect } from "react";
+import "@tensorflow/tfjs";
+import React, { useEffect, useRef } from "react";
 import "./App.css";
-import * as tf from "@tensorflow/tfjs";
-// OLD MODEL
-//import * as facemesh from "@tensorflow-models/facemesh";
-
-// NEW MODEL
 import * as facemesh from "@tensorflow-models/face-landmarks-detection";
 import Webcam from "react-webcam";
 import { drawMesh } from "./utilities";
 
 function App() {
   const webcamRef = useRef(null);
-  const canvasRef = useRef(null);
+  // const canvasRef = useRef(null);
+  let prevPredictions = [];
 
-  //  Load posenet
   const runFacemesh = async () => {
-    // OLD MODEL
-    // const net = await facemesh.load({
-    //   inputResolution: { width: 640, height: 480 },
-    //   scale: 0.8,
-    // });
-    // NEW MODEL
-    const net = await facemesh.load(facemesh.SupportedPackages.mediapipeFacemesh);
+    const net = await facemesh.load(
+      facemesh.SupportedPackages.mediapipeFacemesh
+    );
     setInterval(() => {
       detect(net);
     }, 10);
@@ -44,33 +25,45 @@ function App() {
       webcamRef.current !== null &&
       webcamRef.current.video.readyState === 4
     ) {
-      // Get Video Properties
       const video = webcamRef.current.video;
       const videoWidth = webcamRef.current.video.videoWidth;
       const videoHeight = webcamRef.current.video.videoHeight;
-
-      // Set video width
       webcamRef.current.video.width = videoWidth;
       webcamRef.current.video.height = videoHeight;
-
-      // Set canvas width
-      canvasRef.current.width = videoWidth;
-      canvasRef.current.height = videoHeight;
-
-      // Make Detections
-      // OLD MODEL
-      //       const face = await net.estimateFaces(video);
-      // NEW MODEL
-      const face = await net.estimateFaces({input:video});
-      console.log(face);
-
-      // Get canvas context
-      const ctx = canvasRef.current.getContext("2d");
-      requestAnimationFrame(()=>{drawMesh(face, ctx)});
+      // canvasRef.current.width = videoWidth;
+      // canvasRef.current.height = videoHeight;
+      const predictions = await net.estimateFaces({ input: video });
+      if (prevPredictions.length > 0 && predictions.length > 0) {
+        let curr_prediction = predictions[0].annotations;
+        let prev_prediction = prevPredictions[0].annotations;
+        let nosex = curr_prediction.noseLeftCorner[0][0];
+        let prev_nosex = prev_prediction.noseLeftCorner[0][0];
+        let nosey = curr_prediction.noseLeftCorner[0][1];
+        let prev_nosey = prev_prediction.noseLeftCorner[0][1];
+        let threshold = 10;
+        if (nosex - prev_nosex > threshold) {
+          console.log("Face moved left");
+        } else if (prev_nosex - nosex > threshold) {
+          console.log("Face moved right");
+        }
+        let thresholdy = 6;
+        if (nosey - prev_nosey > thresholdy) {
+          console.log("Face moved down");
+        } else if (prev_nosey - nosey > thresholdy) {
+          console.log("Face moved up");
+        }
+      }
+      prevPredictions = predictions;
+      // const ctx = canvasRef.current.getContext("2d");
+      // requestAnimationFrame(() => {
+      //   drawMesh(predictions, ctx);
+      // });
     }
   };
 
-  useEffect(()=>{runFacemesh()}, []);
+  useEffect(() => {
+    runFacemesh();
+  }, []);
 
   return (
     <div className="App">
@@ -90,7 +83,7 @@ function App() {
           }}
         />
 
-        <canvas
+        {/* <canvas
           ref={canvasRef}
           style={{
             position: "absolute",
@@ -103,7 +96,7 @@ function App() {
             width: 640,
             height: 480,
           }}
-        />
+        /> */}
       </header>
     </div>
   );
